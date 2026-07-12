@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <base href="$FLUTTER_BASE_HREF">
+
+  <meta charset="UTF-8">
+  <meta content="IE=Edge" http-equiv="X-UA-Compatible">
+  <meta name="description" content="Flacron Auto Social — Your AI Social Media Manager for daily posts, campaigns, AR content, scheduling, analytics, and business growth.">
+
+  <!-- iOS meta tags & icons -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="apple-mobile-web-app-title" content="Flacron Auto Social">
+  <link rel="apple-touch-icon" href="icons/Icon-192.png">
+
+  <!-- Favicon -->
+  <link rel="icon" type="image/png" href="favicon.png"/>
+
+  <title>Flacron Auto Social</title>
+  <link rel="manifest" href="manifest.json">
+
+  <style>
+    /* Simple loading splash shown before Flutter's engine takes over,
+       styled with Flacron brand colors so the transition feels seamless. */
+    html, body { height: 100%; margin: 0; background: #FFFFFF; }
+    #flacron-splash {
+      position: fixed; inset: 0; display: flex; flex-direction: column;
+      align-items: center; justify-content: center; background: #FFFFFF;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    }
+    #flacron-splash .dot {
+      width: 40px; height: 40px; border-radius: 50%; background: #D91E2A;
+      margin-bottom: 16px; animation: pulse 1.2s ease-in-out infinite;
+    }
+    @keyframes pulse { 0%, 100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.15); opacity: 0.7; } }
+    #flacron-splash p { color: #5C5C66; font-size: 14px; }
+  </style>
+</head>
+<body>
+  <div id="flacron-splash">
+    <div class="dot"></div>
+    <p>Loading Flacron Auto Social…</p>
+  </div>
+
+  <script src="flutter_bootstrap.js" async></script>
+</body>
+</html>
