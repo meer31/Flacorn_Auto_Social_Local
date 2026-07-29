@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "771760533066",
+    "project_id": "flacronsocialauto",
+    "storage_bucket": "flacronsocialauto.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:771760533066:android:33350a125eaada96c380b3",
+        "android_client_info": {
+          "package_name": "com.flacron.flacron_auto_social"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "771760533066-i9abclpka262vv963opj9au5g88sd9ia.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAiGfR4riO-7qZkYl3CsLU4mM3wwceJMxA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "771760533066-i9abclpka262vv963opj9au5g88sd9ia.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

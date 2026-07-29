@@ -1,0 +1,58 @@
+rules_version = '2';
+
+// ============================================================================
+// FLACRON SOCIAL AUTO — CLOUD STORAGE SECURITY RULES
+// Storage layout:
+//   /users/{userId}/media/{fileName}            -> user-uploaded media library
+//   /users/{userId}/ar/{fileName}                -> AR source images / previews
+//   /users/{userId}/reports/{fileName}           -> generated PDF reports
+//   /agencies/{agencyId}/branding/{fileName}     -> white-label logos/assets
+// ============================================================================
+
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isValidUpload() {
+      // Max 25MB uploads, images/video only for media library
+      return request.resource.size < 25 * 1024 * 1024 &&
+        (request.resource.contentType.matches('image/.*') ||
+         request.resource.contentType.matches('video/.*'));
+    }
+
+    match /users/{userId}/media/{fileName} {
+      allow read: if isOwner(userId);
+      allow write: if isOwner(userId) && isValidUpload();
+      allow delete: if isOwner(userId);
+    }
+
+    match /users/{userId}/ar/{fileName} {
+      allow read: if isOwner(userId);
+      allow write: if isOwner(userId) && isValidUpload();
+      allow delete: if isOwner(userId);
+    }
+
+    // Reports are generated server-side only; client can read (download) them.
+    match /users/{userId}/reports/{fileName} {
+      allow read: if isOwner(userId);
+      allow write: if false;
+    }
+
+    match /agencies/{agencyId}/branding/{fileName} {
+      allow read: if isSignedIn();
+      allow write: if false; // managed via Cloud Functions after plan check
+    }
+
+    // Deny everything else by default.
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}

@@ -1,0 +1,7 @@
+{
+  "projects": {
+    "default": "flacron-social-auto-dev",
+    "staging": "flacron-social-auto-staging",
+    "production": "flacron-social-auto-prod"
+  }
+}

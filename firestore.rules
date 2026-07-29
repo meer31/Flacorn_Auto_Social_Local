@@ -1,0 +1,277 @@
+rules_version = '2';
+
+// ============================================================================
+// FLACRON AUTO SOCIAL — FIRESTORE SECURITY RULES
+// ----------------------------------------------------------------------------
+// Principles enforced here:
+//  1. WORKSPACES are the tenant that owns all content (social accounts,
+//     posts, campaigns, media, etc.) — not individual users. A user reads/
+//     writes workspace content only if they're a member of that workspace,
+//     with role-appropriate permissions. See docs/TEAM_RBAC.md.
+//  2. /users/{userId} is identity/profile ONLY (name, email,
+//     defaultWorkspaceId) — never content. A user can only read/write
+//     their own profile.
+//  3. Sensitive fields (tokens, secrets) are NEVER written by the client —
+//     those documents/fields are Cloud-Functions-only (admin SDK bypasses
+//     rules, so we simply deny ALL client writes to those paths).
+//  4. Subscription documents are read-only from the client, keyed by
+//     workspaceId now (billing belongs to the workspace, shared by every
+//     member). Only Cloud Functions (via the Admin SDK) may write them
+//     after verifying a Stripe webhook.
+//  5. Agency data is scoped to members of that agency (separate concept
+//     from workspace membership — an agency manages several CLIENT
+//     workspaces; workspace membership is who can act WITHIN one business).
+//  6. Admin collection is fully locked down to the client; access is via
+//     Cloud Functions guarded by a custom claim ("admin": true).
+// ============================================================================
+
+function isSignedIn() {
+  return request.auth != null;
+}
+
+function isOwnerOfProfile(userId) {
+  return isSignedIn() && request.auth.uid == userId;
+}
+
+function isAdmin() {
+  return isSignedIn() && request.auth.token.admin == true;
+}
+
+function isWorkspaceMember(workspaceId) {
+  return isSignedIn() &&
+    exists(/databases/$(database)/documents/workspaces/$(workspaceId)/members/$(request.auth.uid));
+}
+
+function workspaceRole(workspaceId) {
+  return get(/databases/$(database)/documents/workspaces/$(workspaceId)/members/$(request.auth.uid)).data.role;
+}
+
+// editor, admin, owner may create/edit content. viewer is read-only.
+function canEditWorkspaceContent(workspaceId) {
+  return isWorkspaceMember(workspaceId) && workspaceRole(workspaceId) != 'viewer';
+}
+
+// admin or owner — team management, member removal, approvals.
+function isWorkspaceAdmin(workspaceId) {
+  return isWorkspaceMember(workspaceId) &&
+    (workspaceRole(workspaceId) == 'admin' || workspaceRole(workspaceId) == 'owner');
+}
+
+function isAgencyMember(agencyId) {
+  return isSignedIn() &&
+    exists(/databases/$(database)/documents/agencies/$(agencyId)/members/$(request.auth.uid));
+}
+
+// Fields that must never be set/modified directly by a client write.
+function noSensitiveFieldsChanged(sensitiveKeys) {
+  return !request.resource.data.diff(resource.data).affectedKeys().hasAny(sensitiveKeys);
+}
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ------------------------------------------------------------------
+    // USERS — identity/profile only. NOT content. See workspaces/ below
+    // for everything a user actually creates/manages.
+    // ------------------------------------------------------------------
+    match /users/{userId} {
+      allow read: if isOwnerOfProfile(userId) || isAdmin();
+      allow create: if isOwnerOfProfile(userId);
+      // Users may update their own profile fields, but never role/isAdmin,
+      // and never defaultWorkspaceId directly (that's set by
+      // onAuthUserCreate / a future "switch workspace" callable — letting
+      // the client set it directly would let someone claim membership in
+      // a workspace they were never invited to just by editing this field;
+      // the actual access check always happens on the workspace's own
+      // members subcollection regardless, but keep this field
+      // server-controlled to avoid a confusing UI where a user "switches"
+      // into a workspace they can't actually read anything in).
+      allow update: if isOwnerOfProfile(userId) &&
+        !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'isAdmin', 'defaultWorkspaceId']);
+      allow delete: if isAdmin();
+    }
+
+    // ------------------------------------------------------------------
+    // WORKSPACES — the tenant. Owns all content.
+    // ------------------------------------------------------------------
+    match /workspaces/{workspaceId} {
+      allow read: if isWorkspaceMember(workspaceId) || isAdmin();
+      allow write: if false; // created by onAuthUserCreate; edited via a future updateWorkspaceDetails callable
+
+      // ---- Membership: read by any member, write is backend-only
+      // (invite/accept/updateRole/remove flows — see functions/src/workspaces/) ----
+      match /members/{memberId} {
+        allow read: if isWorkspaceMember(workspaceId);
+        allow write: if false;
+      }
+
+      // ---- Approvals: editors create requests, admins decide them —
+      // both go through Cloud Functions (requestApproval/decideApproval)
+      // so notification side-effects and status transitions stay atomic. ----
+      match /approvals/{approvalId} {
+        allow read: if isWorkspaceMember(workspaceId);
+        allow write: if false;
+      }
+
+      // ---- Social accounts: tokens are Cloud-Functions-only ----
+      match /socialAccounts/{socialAccountId} {
+        allow read: if isWorkspaceMember(workspaceId);
+        allow create, update: if canEditWorkspaceContent(workspaceId) &&
+          noSensitiveFieldsChanged(['accessTokenEncrypted', 'refreshTokenEncrypted', 'tokenExpiry']);
+        allow delete: if canEditWorkspaceContent(workspaceId);
+      }
+
+      // ---- Post templates ----
+      match /postTemplates/{templateId} {
+        allow read: if isWorkspaceMember(workspaceId);
+        allow write: if canEditWorkspaceContent(workspaceId);
+      }
+
+      // ---- Scheduled posts ----
+      match /scheduledPosts/{postId} {
+        allow read: if isWorkspaceMember(workspaceId);
+        // status/externalPostId/errorMessage/retryCount are set by the
+        // backend worker or the requestApproval/decideApproval callables
+        // only — never directly by the client, even an admin's client.
+        allow create, update: if canEditWorkspaceContent(workspaceId) &&
+          noSensitiveFieldsChanged(['externalPostId', 'status', 'errorMessage', 'retryCount', 'approvalId']);
+        allow delete: if canEditWorkspaceContent(workspaceId);
+      }
+
+      // ---- Post insights (analytics) — backend-written only ----
+      match /postInsights/{insightId} {
+        allow read: if isWorkspaceMember(workspaceId);
+        allow write: if false;
+      }
+
+      // ---- Content plans / calendars ----
+      match /contentPlans/{planId} {
+        allow read: if isWorkspaceMember(workspaceId);
+        allow write: if canEditWorkspaceContent(workspaceId);
+      }
+
+      // ---- Campaigns ----
+      match /campaigns/{campaignId} {
+        allow read: if isWorkspaceMember(workspaceId);
+        allow write: if canEditWorkspaceContent(workspaceId);
+      }
+
+      // ---- AR campaigns ----
+      match /arCampaigns/{arCampaignId} {
+        allow read: if isWorkspaceMember(workspaceId);
+        allow write: if canEditWorkspaceContent(workspaceId);
+      }
+
+      // ---- Business settings / booking info — admin+ only to change,
+      // since this affects the whole workspace's AI brand voice/behavior ----
+      match /businessSettings/{settingsId} {
+        allow read: if isWorkspaceMember(workspaceId);
+        allow write: if isWorkspaceAdmin(workspaceId);
+      }
+
+      // ---- Brand voice — same reasoning as businessSettings ----
+      match /brandVoice/{brandVoiceId} {
+        allow read: if isWorkspaceMember(workspaceId);
+        allow write: if isWorkspaceAdmin(workspaceId);
+      }
+
+      // ---- Media library ----
+      match /media/{mediaId} {
+        allow read: if isWorkspaceMember(workspaceId);
+        allow write: if canEditWorkspaceContent(workspaceId);
+      }
+
+      // ---- Notifications: created by backend, marked read by the
+      // targeted member (or any member, for workspace-wide alerts where
+      // targetUid is null) ----
+      match /notifications/{notificationId} {
+        allow read: if isWorkspaceMember(workspaceId);
+        allow update: if isWorkspaceMember(workspaceId) &&
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['read', 'readAt']);
+        allow create, delete: if false; // backend only
+      }
+
+      // ---- Weekly AI reports — backend-generated only ----
+      match /weeklyReports/{reportId} {
+        allow read: if isWorkspaceMember(workspaceId);
+        allow write: if false;
+      }
+
+      // ---- Search index — backend-generated only (see
+      // functions/src/search/indexSearchableEntities.ts) ----
+      match /searchIndex/{indexId} {
+        allow read: if isWorkspaceMember(workspaceId);
+        allow write: if false;
+      }
+    }
+
+    // ------------------------------------------------------------------
+    // INVITES — top-level (not nested under workspaces, since an invited
+    // person isn't a member yet and can't satisfy isWorkspaceMember()).
+    // Entirely backend-managed: inviteMember creates, acceptInvite updates.
+    // ------------------------------------------------------------------
+    match /invites/{inviteId} {
+      allow read: if isSignedIn() &&
+        resource.data.email == request.auth.token.email;
+      allow write: if false;
+    }
+
+    // ------------------------------------------------------------------
+    // SUBSCRIPTIONS — keyed by workspaceId now (shared by every member of
+    // that workspace). Read-only to members; written only by Cloud
+    // Functions (Stripe webhook handler) using the Admin SDK.
+    // ------------------------------------------------------------------
+    match /subscriptions/{workspaceId} {
+      allow read: if isWorkspaceMember(workspaceId) || isAdmin();
+      allow write: if false;
+    }
+
+    // ------------------------------------------------------------------
+    // AGENCIES — a separate concept from workspace membership: an agency
+    // manages several CLIENT workspaces. Being an agency member does not
+    // by itself grant workspace membership in a client's workspace (that
+    // still requires an explicit members/{uid} doc on that workspace,
+    // typically created when the agency onboards the client).
+    // ------------------------------------------------------------------
+    match /agencies/{agencyId} {
+      allow read: if isAgencyMember(agencyId) || isAdmin();
+      allow write: if isAdmin(); // agency root managed via Cloud Functions
+
+      match /members/{memberId} {
+        allow read: if isAgencyMember(agencyId);
+        allow write: if false; // backend only (invite/accept flow)
+      }
+
+      match /clients/{clientId} {
+        allow read: if isAgencyMember(agencyId);
+        allow write: if isAgencyMember(agencyId);
+
+        match /{document=**} {
+          allow read: if isAgencyMember(agencyId);
+          allow write: if isAgencyMember(agencyId);
+        }
+      }
+    }
+
+    // ------------------------------------------------------------------
+    // AUDIT LOGS — server-write only, admin-read only
+    // ------------------------------------------------------------------
+    match /auditLogs/{logId} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+
+    // ------------------------------------------------------------------
+    // ADMIN-ONLY COLLECTIONS (system config, plan definitions, coupons)
+    // ------------------------------------------------------------------
+    match /systemConfig/{docId} {
+      allow read: if isSignedIn(); // plan pricing etc. can be public-ish to authed users
+      allow write: if isAdmin();
+    }
+
+    // Default deny for anything not explicitly matched above.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
