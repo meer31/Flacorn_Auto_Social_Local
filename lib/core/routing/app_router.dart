@@ -84,7 +84,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
   return GoRouter(
     initialLocation: AppRoutes.login,
     redirect: (context, state) {
-      final isLoggedIn = authState.valueOrNull != null;
+    final isLoggedIn = authState.value != null;;
       final isAuthRoute = [
         AppRoutes.login,
         AppRoutes.register,
