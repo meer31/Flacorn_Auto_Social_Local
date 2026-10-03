@@ -1,3 +1,5 @@
+import 'package:flacron_auto_social/core/demo/demo_config.dart';
+import 'package:flacron_auto_social/core/demo/demo_widgets.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -13,21 +15,34 @@ class ConnectedAccountsScreen extends ConsumerStatefulWidget {
   const ConnectedAccountsScreen({super.key});
 
   @override
-  ConsumerState<ConnectedAccountsScreen> createState() => _ConnectedAccountsScreenState();
+  ConsumerState<ConnectedAccountsScreen> createState() =>
+      _ConnectedAccountsScreenState();
 }
 
-class _ConnectedAccountsScreenState extends ConsumerState<ConnectedAccountsScreen> {
+class _ConnectedAccountsScreenState
+    extends ConsumerState<ConnectedAccountsScreen> {
   String? _busyPlatform;
 
   Future<void> _connect(String platform) async {
     setState(() => _busyPlatform = platform);
     try {
-      final url = await ref.read(socialAccountRepositoryProvider).getOAuthUrl(platform);
+      final url =
+          await ref.read(socialAccountRepositoryProvider).getOAuthUrl(platform);
       final uri = Uri.parse(url);
-      if (await canLaunchUrl(uri)) await launchUrl(uri, mode: LaunchMode.externalApplication);
+      // new lines start
+      if (kDemoMode && url.startsWith('demo://connect-account/')) {
+        final platform = url.replaceFirst('demo://connect-account/', '');
+        final uid = ref.read(socialAccountRepositoryProvider)!;
+        await DemoOAuthBypass.handle(context, platform, uid as String);
+        return; // skip the real URL launch
+      }
+
+      // new lines end
+      // if (await canLaunchUrl(uri)) await launchUrl(uri, mode: LaunchMode.externalApplication);
     } catch (err) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Connection failed: $err')));
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text('Connection failed: $err')));
       }
     } finally {
       if (mounted) setState(() => _busyPlatform = null);
@@ -40,44 +55,50 @@ class _ConnectedAccountsScreenState extends ConsumerState<ConnectedAccountsScree
 
   @override
   Widget build(BuildContext context) {
-    final accounts = ref.watch(dashboardSocialAccountsProvider).valueOrNull ?? [];
+    final accounts =
+        ref.watch(dashboardSocialAccountsProvider).valueOrNull ?? [];
 
     return Padding(
       padding: const EdgeInsets.all(24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Connected Accounts', style: AppTextStyles.headlineLarge(AppColors.textPrimary)),
+          Text('Connected Accounts',
+              style: AppTextStyles.headlineLarge(AppColors.textPrimary)),
           const SizedBox(height: 6),
           Text(
             'Connect your social platforms so Flacron can publish and analyze on your behalf.',
             style: AppTextStyles.bodyMedium(AppColors.textSecondary),
           ),
           const SizedBox(height: 24),
-
           Wrap(
             spacing: 12,
             runSpacing: 12,
             children: [
               for (final platform in AppConstants.supportedPlatforms)
                 OutlinedButton.icon(
-                  onPressed: _busyPlatform == platform ? null : () => _connect(platform),
+                  onPressed: _busyPlatform == platform
+                      ? null
+                      : () => _connect(platform),
                   icon: _busyPlatform == platform
                       ? const SizedBox(
-                          height: 14, width: 14, child: CircularProgressIndicator(strokeWidth: 2))
+                          height: 14,
+                          width: 14,
+                          child: CircularProgressIndicator(strokeWidth: 2))
                       : const Icon(Icons.add, size: 18),
-                  label: Text('Connect ${platform[0].toUpperCase()}${platform.substring(1)}'),
+                  label: Text(
+                      'Connect ${platform[0].toUpperCase()}${platform.substring(1)}'),
                 ),
             ],
           ),
           const SizedBox(height: 24),
-
           Expanded(
             child: accounts.isEmpty
                 ? const EmptyState(
                     icon: Icons.link_off,
                     title: 'No accounts connected yet',
-                    message: 'Connect Instagram, Facebook, X, or LinkedIn to start publishing.',
+                    message:
+                        'Connect Instagram, Facebook, X, or LinkedIn to start publishing.',
                   )
                 : ListView.separated(
                     itemCount: accounts.length,
@@ -112,12 +133,17 @@ class _ConnectedAccountsScreenState extends ConsumerState<ConnectedAccountsScree
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
                                   Text(account.accountName,
-                                      style: AppTextStyles.titleMedium(AppColors.textPrimary)),
+                                      style: AppTextStyles.titleMedium(
+                                          AppColors.textPrimary)),
                                   const SizedBox(height: 2),
                                   Text(
-                                    account.needsReconnect ? 'Reconnect required' : 'Connected',
+                                    account.needsReconnect
+                                        ? 'Reconnect required'
+                                        : 'Connected',
                                     style: AppTextStyles.bodySmall(
-                                      account.needsReconnect ? AppColors.warning : AppColors.success,
+                                      account.needsReconnect
+                                          ? AppColors.warning
+                                          : AppColors.success,
                                     ),
                                   ),
                                 ],
@@ -129,7 +155,8 @@ class _ConnectedAccountsScreenState extends ConsumerState<ConnectedAccountsScree
                                 child: const Text('Reconnect'),
                               ),
                             IconButton(
-                              icon: const Icon(Icons.delete_outline, color: AppColors.error),
+                              icon: const Icon(Icons.delete_outline,
+                                  color: AppColors.error),
                               onPressed: () => _disconnect(account.id),
                             ),
                           ],

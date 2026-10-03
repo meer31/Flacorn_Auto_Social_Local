@@ -23,6 +23,15 @@ class UserProfile {
   /// access. See WorkspaceRepository.watchMembers for the full list.
   final String? defaultWorkspaceId;
 
+  // ---- Business / Booking CTA settings (PDF Section 19) ----
+  final String? bookingLink;
+  final String? phoneNumber;
+  final String? website;
+  final String? promoCode;
+  final String? serviceArea;
+  final String? businessHours;
+  final String? defaultCTA;
+
   const UserProfile({
     required this.userId,
     required this.name,
@@ -34,6 +43,13 @@ class UserProfile {
     required this.mainGoal,
     required this.brandTone,
     this.defaultWorkspaceId,
+    this.bookingLink,
+    this.phoneNumber,
+    this.website,
+    this.promoCode,
+    this.serviceArea,
+    this.businessHours,
+    this.defaultCTA,
   });
 
   factory UserProfile.fromMap(String id, Map<String, dynamic> map) {
@@ -48,6 +64,13 @@ class UserProfile {
       mainGoal: map['mainGoal'] as String? ?? '',
       brandTone: map['brandTone'] as String? ?? '',
       defaultWorkspaceId: map['defaultWorkspaceId'] as String?,
+      bookingLink: map['bookingLink'] as String?,
+      phoneNumber: map['phoneNumber'] as String?,
+      website: map['website'] as String?,
+      promoCode: map['promoCode'] as String?,
+      serviceArea: map['serviceArea'] as String?,
+      businessHours: map['businessHours'] as String?,
+      defaultCTA: map['defaultCTA'] as String?,
     );
   }
 
@@ -62,6 +85,13 @@ class UserProfile {
       'mainGoal': mainGoal,
       'brandTone': brandTone,
       'defaultWorkspaceId': defaultWorkspaceId,
+      if (bookingLink != null) 'bookingLink': bookingLink,
+      if (phoneNumber != null) 'phoneNumber': phoneNumber,
+      if (website != null) 'website': website,
+      if (promoCode != null) 'promoCode': promoCode,
+      if (serviceArea != null) 'serviceArea': serviceArea,
+      if (businessHours != null) 'businessHours': businessHours,
+      if (defaultCTA != null) 'defaultCTA': defaultCTA,
     };
   }
 }

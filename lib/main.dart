@@ -1,8 +1,10 @@
+import 'package:flacron_auto_social/core/demo/demo_seed.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'app.dart';
 import 'core/services/firebase_options.dart';
+import 'core/demo/demo_config.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -17,6 +19,13 @@ Future<void> main() async {
   //   FirebaseStorage.instance.useStorageEmulator('localhost', 9199);
   // Gate this behind a --dart-define=USE_EMULATOR=true flag so production
   // builds never accidentally point at localhost.
+
+// new lines start
+  if (kDemoMode) {
+    await DemoSeeder.seed();
+  }
+
+//new lines end
 
   runApp(const ProviderScope(child: FlacronSocialAutoApp()));
 }

@@ -1,3 +1,4 @@
+import 'package:flacron_auto_social/features/booking_cta/screens/booking_cta_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -34,6 +35,8 @@ import '../../features/agency/screens/agency_workspace_screen.dart';
 import '../../features/admin/screens/admin_panel_screen.dart';
 import '../../features/global_search/screens/global_search_screen.dart';
 import '../../features/team/screens/team_screen.dart';
+import '../../features/review_to_post/screens/review_to_post_screen.dart';
+import '../../features/content_score/screens/content_score_screen.dart';
 
 import '../widgets/app_shell.dart';
 
@@ -73,6 +76,9 @@ class AppRoutes {
   static const adminPanel = '/admin';
   static const globalSearch = '/search';
   static const team = '/team';
+  static const reviewToPost = '/review-to-post';
+  static const bookingCta = '/booking-cta';
+  static const contentScore = '/content-score';
 }
 
 /// Riverpod provider for the app's [GoRouter], reacting to auth state so
@@ -84,7 +90,7 @@ final appRouterProvider = Provider<GoRouter>((ref) {
   return GoRouter(
     initialLocation: AppRoutes.login,
     redirect: (context, state) {
-      const isLoggedIn = true;
+      final isLoggedIn = authState.valueOrNull != null;
       final isAuthRoute = [
         AppRoutes.login,
         AppRoutes.register,
@@ -194,6 +200,18 @@ final appRouterProvider = Provider<GoRouter>((ref) {
               path: AppRoutes.adminPanel,
               builder: (_, __) => const AdminPanelScreen()),
           GoRoute(path: AppRoutes.team, builder: (_, __) => const TeamScreen()),
+          GoRoute(
+            path: AppRoutes.reviewToPost,
+            builder: (_, __) => const ReviewToPostScreen(),
+          ),
+          GoRoute(
+            path: AppRoutes.bookingCta,
+            builder: (_, __) => const BookingCtaScreen(),
+          ),
+          GoRoute(
+            path: AppRoutes.contentScore,
+            builder: (_, __) => const ContentScoreScreen(),
+          ),
           GoRoute(
             path: AppRoutes.globalSearch,
             // Mobile entry point (see BottomNav/SidebarNav for how each

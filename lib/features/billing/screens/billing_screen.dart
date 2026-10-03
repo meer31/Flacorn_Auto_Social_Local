@@ -1,3 +1,5 @@
+import 'package:flacron_auto_social/core/demo/demo_config.dart';
+import 'package:flacron_auto_social/core/demo/demo_widgets.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -24,12 +26,24 @@ class _BillingScreenState extends ConsumerState<BillingScreen> {
   Future<void> _openPortal() async {
     setState(() => _busy = true);
     try {
-      final url = await ref.read(subscriptionRepositoryProvider).getBillingPortalUrl();
+      final url =
+          await ref.read(subscriptionRepositoryProvider).getBillingPortalUrl();
       final uri = Uri.parse(url);
-      if (await canLaunchUrl(uri)) await launchUrl(uri, mode: LaunchMode.externalApplication);
+
+      // new lines start
+      if (kDemoMode && url.startsWith('demo://activate-plan/')) {
+        final plan = url.replaceFirst('demo://activate-plan/', '');
+        final uid = ref.read(socialAccountRepositoryProvider)!;
+        await DemoBillingBypass.handle(context, plan, uid as String);
+        return;
+      }
+
+      // new lines end
+      //  if (await canLaunchUrl(uri)) await launchUrl(uri, mode: LaunchMode.externalApplication);
     } catch (err) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Could not open billing portal: $err')));
+        ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Could not open billing portal: $err')));
       }
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -48,10 +62,12 @@ class _BillingScreenState extends ConsumerState<BillingScreen> {
             cancelUrl: 'https://app.flacronsocialauto.com/billing',
           );
       final uri = Uri.parse(url);
-      if (await canLaunchUrl(uri)) await launchUrl(uri, mode: LaunchMode.externalApplication);
+      if (await canLaunchUrl(uri))
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
     } catch (err) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Could not start checkout: $err')));
+        ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Could not start checkout: $err')));
       }
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -70,7 +86,8 @@ class _BillingScreenState extends ConsumerState<BillingScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text('Billing', style: AppTextStyles.headlineLarge(AppColors.textPrimary)),
+              Text('Billing',
+                  style: AppTextStyles.headlineLarge(AppColors.textPrimary)),
               OutlinedButton(
                 onPressed: _busy ? null : _openPortal,
                 child: const Text('Manage Billing / Invoices'),
@@ -96,7 +113,11 @@ class _BillingScreenState extends ConsumerState<BillingScreen> {
                   planKey: 'starter',
                   name: 'Starter',
                   price: '\$29/month',
-                  features: const ['3 social accounts', '10 AI generations/mo', '10 scheduled posts/mo'],
+                  features: const [
+                    '3 social accounts',
+                    '10 AI generations/mo',
+                    '10 scheduled posts/mo'
+                  ],
                   selected: subscription?.planName == 'starter',
                   onTap: () => _switchPlan('starter'),
                 ),
@@ -105,7 +126,12 @@ class _BillingScreenState extends ConsumerState<BillingScreen> {
                   name: 'Pro',
                   price: '\$79/month',
                   highlighted: true,
-                  features: const ['10 social accounts', '300 AI generations/mo', 'Unlimited scheduling', 'AR preview'],
+                  features: const [
+                    '10 social accounts',
+                    '300 AI generations/mo',
+                    'Unlimited scheduling',
+                    'AR preview'
+                  ],
                   selected: subscription?.planName == 'pro',
                   onTap: () => _switchPlan('pro'),
                 ),
@@ -113,7 +139,12 @@ class _BillingScreenState extends ConsumerState<BillingScreen> {
                   planKey: 'agency',
                   name: 'Agency',
                   price: '\$199/month',
-                  features: const ['30 social accounts', 'Unlimited AI', 'Client workspaces', 'AR campaign builder'],
+                  features: const [
+                    '30 social accounts',
+                    'Unlimited AI',
+                    'Client workspaces',
+                    'AR campaign builder'
+                  ],
                   selected: subscription?.planName == 'agency',
                   onTap: () => _switchPlan('agency'),
                 ),
